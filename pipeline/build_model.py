@@ -112,6 +112,8 @@ def build() -> dict[str, pd.DataFrame]:
     o["delivery_status"] = np.select(
         [o.is_delivered == 0, o.days_vs_estimate <= 0, o.days_vs_estimate <= 3, o.days_vs_estimate <= 7],
         ["Not delivered", "On time", "1-3 days late", "4-7 days late"], "8+ days late")
+    o["delivery_status_sort"] = o.delivery_status.map(
+        {"On time": 1, "1-3 days late": 2, "4-7 days late": 3, "8+ days late": 4, "Not delivered": 5})
     o["approval_hours"] = (o.order_approved_at - o.order_purchase_timestamp).dt.total_seconds() / 3600
     o["seller_to_carrier_days"] = (o.order_delivered_carrier_date - o.order_approved_at).dt.total_seconds() / day
     o["carrier_to_customer_days"] = (o.order_delivered_customer_date - o.order_delivered_carrier_date).dt.total_seconds() / day
@@ -158,7 +160,7 @@ def build() -> dict[str, pd.DataFrame]:
                     "items_count", "sellers_count", "merchandise_value", "freight_value", "payment_value",
                     "payment_type", "installments", "purchase_hour", "approval_hours", "seller_to_carrier_days",
                     "carrier_to_customer_days", "delivery_days", "promised_days", "days_vs_estimate", "is_late",
-                    "delivery_status", "customer_state", "seller_state", "is_same_state", "review_score",
+                    "delivery_status", "delivery_status_sort", "customer_state", "seller_state", "is_same_state", "review_score",
                     "has_review_comment", "customer_order_seq", "is_first_order", "months_since_first_order"]].copy()
     fct_orders["order_status"] = fct_orders.order_status.str.title()
 
@@ -196,8 +198,12 @@ def build() -> dict[str, pd.DataFrame]:
          c.recency_days <= 90, (c.recency_days <= 365) & (c.lifetime_gmv >= hi_value), c.recency_days <= 365],
         ["Loyal repeat", "Lapsed repeat", "New (last 90 days)", "High-value one-timer", "One-timer, cooling"],
         "Dormant (1 yr+)")
-    c["value_band"] = pd.cut(c.lifetime_gmv, [-1, 50, 100, 200, 500, np.inf],
-                             labels=["< R$50", "R$50-100", "R$100-200", "R$200-500", "R$500+"]).astype(str)
+    c["rfm_segment_sort"] = c.rfm_segment.map({s: i for i, s in enumerate(
+        ["Loyal repeat", "Lapsed repeat", "New (last 90 days)", "High-value one-timer", "One-timer, cooling",
+         "Dormant (1 yr+)"], 1)})
+    bands = ["< R$50", "R$50-100", "R$100-200", "R$200-500", "R$500+"]
+    c["value_band"] = pd.cut(c.lifetime_gmv, [-1, 50, 100, 200, 500, np.inf], labels=bands).astype(str)
+    c["value_band_sort"] = c.value_band.map({b: i for i, b in enumerate(bands, 1)})
     dim_customer = c.reset_index()
 
     # ---------- dim_product ----------
@@ -212,8 +218,10 @@ def build() -> dict[str, pd.DataFrame]:
     p["size_band"] = pd.cut(p.weight_g, [-1, 500, 2000, 10000, np.inf],
                             labels=["Small (<0.5 kg)", "Medium (0.5-2 kg)", "Large (2-10 kg)", "Bulky (10 kg+)"]).astype(str)
     p.loc[p.weight_g.isna(), "size_band"] = "Unknown"
+    p["size_band_sort"] = p.size_band.map({"Small (<0.5 kg)": 1, "Medium (0.5-2 kg)": 2, "Large (2-10 kg)": 3,
+                                           "Bulky (10 kg+)": 4, "Unknown": 5})
     sold = fct_items.product_id.unique()
-    dim_product = p[p.product_id.isin(sold)][["product_id", "category", "category_group", "size_band", "weight_g",
+    dim_product = p[p.product_id.isin(sold)][["product_id", "category", "category_group", "size_band", "size_band_sort", "weight_g",
                                               "volume_cm3", "photos_qty", "description_length"]]
 
     # ---------- dim_seller ----------
@@ -223,6 +231,7 @@ def build() -> dict[str, pd.DataFrame]:
     rank = s.seller_gmv.rank(ascending=False, pct=True)
     s["seller_tier"] = np.select([rank <= 0.01, rank <= 0.10, rank <= 0.50], ["Top 1%", "Top 2-10%", "Top 11-50%"],
                                  "Bottom 50%")
+    s["seller_tier_sort"] = s.seller_tier.map({"Top 1%": 1, "Top 2-10%": 2, "Top 11-50%": 3, "Bottom 50%": 4})
     s["state_name"] = s.seller_state.map(lambda x: STATE[x][0])
     s["region"] = s.seller_state.map(lambda x: STATE[x][1])
     s["seller_city"] = s.seller_city.str.title()
@@ -231,7 +240,7 @@ def build() -> dict[str, pd.DataFrame]:
     s["first_sale_date"] = s.seller_id.map(first_sale)
     s["seller_label"] = "Seller " + s.seller_id.str[:6]  # short, readable id for tables
     dim_seller = s[["seller_id", "seller_label", "seller_city", "seller_state", "state_name", "region",
-                    "first_sale_date", "seller_tier", "seller_gmv"]]
+                    "first_sale_date", "seller_tier", "seller_tier_sort", "seller_gmv"]]
 
     # ---------- dim_date ----------
     d = pd.DataFrame({"date": pd.date_range(START.normalize(), END.normalize(), freq="D")})

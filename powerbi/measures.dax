@@ -1,6 +1,7 @@
 // Olist e-commerce semantic model: every measure, grouped by display folder.
 // gen_tmdl.py turns this file into TMDL (home table per folder, format strings).
 // Rules: GMV = item price of non-cancelled orders (freight reported separately).
+// Flags on nullable columns use == 0: in DAX BLANK = 0 is TRUE, so `= 0` would count undelivered orders as on time.
 // Time intelligence removes dim_date filters explicitly, so it works whether or not dim_date is marked as a date table.
 
 // ---------- Sales ----------
@@ -86,7 +87,7 @@ Avg Carrier Transit Days = AVERAGE ( fct_orders[carrier_to_customer_days] )
 
 Same-State Delivery Days = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 1 )
 
-Cross-State Delivery Days = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 0 )
+Cross-State Delivery Days = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] == 0 )
 
 // ---------- Customer Experience ----------
 Avg Review Score = AVERAGE ( fct_orders[review_score] )
@@ -97,7 +98,7 @@ Reviews = COUNT ( fct_orders[review_score] )
 
 1-2 Star % = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] <= 2 ), [Reviews] )
 
-Avg Review On Time = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 0 )
+Avg Review On Time = CALCULATE ( [Avg Review Score], fct_orders[is_late] == 0 )
 
 Avg Review Late = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 1 )
 

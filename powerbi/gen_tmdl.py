@@ -1,11 +1,11 @@
 """measures.dax + star-schema relationships -> TMDL scripts for Power BI's TMDL view (web or Desktop).
 
     python3 powerbi/gen_tmdl.py                      -> powerbi/model.tmdl   (relationships + measures)
-    python3 powerbi/gen_tmdl.py --polish types.txt   -> powerbi/polish.tmdl  (column formats, hidden keys, sort-by)
+    python3 powerbi/gen_tmdl.py --full   -> powerbi/model_full.tmdl (whole model as code)
 
-`ref table` leaves each table as Power Query loaded it; only what is listed is added or replaced.
---polish takes the model's CURRENT column types (`table.column=Type;...`, from INFO.VIEW.COLUMNS) and
-keeps them, because redefining a column with a different dataType converts stored data and can fail.
+--full defines every table except the seed table (created through Power Query Online) with explicit
+column types and an M partition reading the published CSV from GitHub; one data source
+(raw.githubusercontent.com, anonymous) via RelativePath, so the service needs a single credential.
 """
 from __future__ import annotations
 
@@ -116,51 +116,114 @@ COLUMN_PROPS = {
     "dim_seller": {"seller_gmv": MONEY, "first_sale_date": "yyyy-mm-dd"},
     "dim_date": {"date": "yyyy-mm-dd", "month_start": "mmm yyyy", "week_start": "yyyy-mm-dd"},
 }
-SORT_BY = {("dim_date", "month_name"): "month_num", ("dim_date", "weekday"): "weekday_num"}
+SORT_BY = {("dim_date", "month_name"): "month_num", ("dim_date", "weekday"): "weekday_num",
+           ("fct_orders", "delivery_status"): "delivery_status_sort", ("dim_seller", "seller_tier"): "seller_tier_sort",
+           ("dim_customer", "rfm_segment"): "rfm_segment_sort", ("dim_customer", "value_band"): "value_band_sort",
+           ("dim_product", "size_band"): "size_band_sort"}
+SORT_COLS = {v for v in SORT_BY.values()}
 ADDITIVE = {"price", "freight_value", "payment_value", "merchandise_value", "seller_gmv", "lifetime_gmv"}
-MODEL_TYPE = {"Text": "string", "Integer": "int64", "Number": "double", "Decimal": "decimal",
-              "Date": "dateTime", "DateTime": "dateTime", "True/False": "boolean"}
+DATE_COLS = {"date", "month_start", "week_start", "first_order_date", "last_order_date", "cohort_month",
+             "first_sale_date"}
+SOURCE_BASE = "https://raw.githubusercontent.com"
+SOURCE_PATH = "Ajay0704/ecommerce-powerbi/main/data/model"
+SEED_TABLE = "fct_payments"  # created through Power Query Online; every other table is defined here
 
 
-def main_polish(types_file: str) -> None:
-    current: dict[str, dict[str, str]] = {}
-    for item in Path(types_file).read_text().strip().split(";"):
-        k, v = item.split("=")
-        t, c = k.split(".", 1)
-        current.setdefault(t, {})[c] = MODEL_TYPE[v]
+def csv_types(table: str) -> list[tuple[str, str, str]]:
+    """-> [(column, TMDL dataType, Power Query type)] read from the published CSV's pandas dtypes."""
+    import pandas as pd
+    df = pd.read_csv(HERE.parent / "data" / "model" / f"{table}.csv", nrows=5000)
+    out = []
+    for c, dt in df.dtypes.items():
+        if c in DATE_COLS:
+            out.append((c, "dateTime", "type date"))
+        elif str(dt).startswith("int") or (str(dt).startswith("float") and c in KEYS | {
+                "items_count", "sellers_count", "installments", "is_late", "is_same_state", "review_score",
+                "customer_order_seq", "months_since_first_order", "promised_days", "days_vs_estimate",
+                "weight_g", "volume_cm3", "photos_qty", "description_length"}):
+            out.append((c, "int64", "Int64.Type"))
+        elif str(dt).startswith("float"):
+            out.append((c, "double", "type number"))
+        else:
+            out.append((c, "string", "type text"))
+    return out
+
+
+def table_tmdl(table: str, measures: list) -> list[str]:
+    cols = csv_types(table)
+    lines = [f"\ttable {table}"] + (["\t\tdataCategory: Time"] if table == "dim_date" else []) + [""]
+    for m in measures:
+        lines += measure_tmdl(*m)
+    for c, dt, _ in cols:
+        lines += [f"\t\tcolumn {c}", f"\t\t\tdataType: {dt}"]
+        if table == "dim_date" and c == "date":
+            lines.append("\t\t\tisKey")
+        fmt = COLUMN_PROPS.get(table, {}).get(c) or ("yyyy-mm-dd" if dt == "dateTime" else None)
+        if fmt:
+            lines.append(f"\t\t\tformatString: {fmt}")
+        if c in KEYS or c in SORT_COLS:
+            lines.append("\t\t\tisHidden")
+        lines.append(f"\t\t\tsummarizeBy: {'sum' if c in ADDITIVE else 'none'}")
+        lines.append(f"\t\t\tsourceColumn: {c}")
+        if (table, c) in SORT_BY:
+            lines.append(f"\t\t\tsortByColumn: {SORT_BY[(table, c)]}")
+        lines.append("")
+    pairs = ", ".join(f'{{"{c}", {pq}}}' for c, _, pq in cols)
+    lines += [
+        f"\t\tpartition {table} = m",
+        "\t\t\tmode: import",
+        "\t\t\tsource =",
+        "\t\t\t\t\tlet",
+        f'\t\t\t\t\t\tSource = Csv.Document(Web.Contents("{SOURCE_BASE}", [RelativePath = "{SOURCE_PATH}/{table}.csv"]), '
+        '[Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),',
+        "\t\t\t\t\t\tHeaders = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),",
+        f'\t\t\t\t\t\tTyped = Table.TransformColumnTypes(Headers, {{{pairs}}}, "en-US")',
+        "\t\t\t\t\tin",
+        "\t\t\t\t\t\tTyped",
+        "",
+    ]
+    return lines
+
+
+def main_full() -> None:
+    """New tables in full + relationships + measures; the seed table only gets its measures (`ref table`)."""
+    measures = parse_measures((HERE / "measures.dax").read_text())
+    by_table: dict[str, list] = {}
+    for m in measures:
+        by_table.setdefault(HOME[m[0]], []).append(m)
+    tables = ["dim_date", "dim_customer", "dim_product", "dim_seller", "fct_orders", "fct_order_items"]
     lines = ["createOrReplace", ""]
-    n = 0
-    for table, cols in current.items():
-        block = []
-        for c, dt in cols.items():
-            fmt = COLUMN_PROPS.get(table, {}).get(c)
-            hidden = c in KEYS
-            sort = SORT_BY.get((table, c))
-            numeric = dt in ("int64", "double", "decimal")
-            if not (fmt or hidden or sort or numeric):
-                continue
-            # dates stay untouched: redefining them orphans the hidden auto date/time tables
-            if dt == "dateTime" and table != "dim_date":
-                continue
-            block += [f"\t\tcolumn {c}", f"\t\t\tdataType: {dt}"]
-            if fmt:
-                block.append(f"\t\t\tformatString: {fmt}")
-            if hidden:
-                block.append("\t\t\tisHidden")
-            block.append(f"\t\t\tsummarizeBy: {'sum' if c in ADDITIVE else 'none'}")
-            block.append(f"\t\t\tsourceColumn: {c}")
-            if sort:
-                block.append(f"\t\t\tsortByColumn: {sort}")
-            block.append("")
-            n += 1
-        if block:
-            lines += [f"\tref table {table}", ""] + block
-    (HERE / "polish.tmdl").write_text("\n".join(lines) + "\n")
-    print(f"{n} columns -> powerbi/polish.tmdl")
+    for t in tables:
+        lines += table_tmdl(t, by_table.get(t, []))
+    lines += [f"\tref table {SEED_TABLE}", ""]
+    for m in by_table.get(SEED_TABLE, []):
+        lines += measure_tmdl(*m)
+    for ft, fc, tt, tc in RELATIONSHIPS:
+        lines += [f"\trelationship {ft}_{fc}__{tt}", f"\t\tfromColumn: {ft}.{fc}", f"\t\ttoColumn: {tt}.{tc}", ""]
+    (HERE / "model_full.tmdl").write_text("\n".join(lines) + "\n")
+    print(f"{len(tables)} tables, {len(measures)} measures, {len(RELATIONSHIPS)} relationships -> powerbi/model_full.tmdl")
+
+
+def main_sort() -> None:
+    """Add the *_sort columns to the live model without replacing whole tables: `ref table` + the new column,
+    the text column it sorts, and a fresh partition. Full table replaces fail on tables with date columns
+    because the service's hidden auto date/time tables hang off them."""
+    lines = ["createOrReplace", ""]
+    for table in ["fct_orders", "dim_seller", "dim_customer", "dim_product"]:
+        block = table_tmdl(table, [])
+        wanted = {c for (t_, c), s_ in SORT_BY.items() if t_ == table} | {s_ for (t_, _), s_ in SORT_BY.items() if t_ == table}
+        out, keep = [f"\tref table {table}", ""], False
+        for line in block[1:]:
+            if line.startswith("\t\tcolumn "):
+                keep = line.split("column ", 1)[1] in wanted
+            elif line.startswith("\t\tpartition "):
+                keep = True
+            if keep:
+                out.append(line)
+        lines += out
+    (HERE / "model_sort.tmdl").write_text("\n".join(lines) + "\n")
+    print("sort columns -> powerbi/model_sort.tmdl")
 
 
 if __name__ == "__main__":
-    if "--polish" in sys.argv:
-        main_polish(sys.argv[sys.argv.index("--polish") + 1])
-    else:
-        main_model()
+    main_sort() if "--sort" in sys.argv else main_full() if "--full" in sys.argv else main_model()

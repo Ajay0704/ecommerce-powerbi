@@ -1,0 +1,840 @@
+createOrReplace
+
+	table dim_date
+		dataCategory: Time
+
+		column date_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: date_key
+
+		column date
+			dataType: dateTime
+			isKey
+			formatString: yyyy-mm-dd
+			summarizeBy: none
+			sourceColumn: date
+
+		column year
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: year
+
+		column quarter
+			dataType: string
+			summarizeBy: none
+			sourceColumn: quarter
+
+		column month_num
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: month_num
+
+		column month_name
+			dataType: string
+			summarizeBy: none
+			sourceColumn: month_name
+			sortByColumn: month_num
+
+		column year_month
+			dataType: string
+			summarizeBy: none
+			sourceColumn: year_month
+
+		column month_start
+			dataType: dateTime
+			formatString: mmm yyyy
+			summarizeBy: none
+			sourceColumn: month_start
+
+		column week_start
+			dataType: dateTime
+			formatString: yyyy-mm-dd
+			summarizeBy: none
+			sourceColumn: week_start
+
+		column weekday_num
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: weekday_num
+
+		column weekday
+			dataType: string
+			summarizeBy: none
+			sourceColumn: weekday
+			sortByColumn: weekday_num
+
+		column is_weekend
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_weekend
+
+		partition dim_date = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/dim_date.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"date_key", Int64.Type}, {"date", type date}, {"year", Int64.Type}, {"quarter", type text}, {"month_num", Int64.Type}, {"month_name", type text}, {"year_month", type text}, {"month_start", type date}, {"week_start", type date}, {"weekday_num", Int64.Type}, {"weekday", type text}, {"is_weekend", Int64.Type}}, "en-US")
+					in
+						Typed
+
+	table dim_customer
+
+		measure 'Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'New Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_first_order] = 1 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Returning Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0, fct_orders[is_first_order] = 0 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Repeat Order %' = DIVIDE ( CALCULATE ( [Orders], fct_orders[is_first_order] = 0 ), [Orders] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Customer Count' = COUNTROWS ( dim_customer )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Repeat Customer Rate' = DIVIDE ( CALCULATE ( [Customer Count], dim_customer[is_repeat_customer] = 1 ), [Customer Count] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Avg Lifetime GMV' = AVERAGE ( dim_customer[lifetime_gmv] )
+			formatString: \R\$ #,0.00
+			displayFolder: Customers
+
+		measure 'Retention %' = DIVIDE ( [Customers], [Customer Count] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Customer Insight' = ```
+				FORMAT ( 1 - [Repeat Customer Rate], "0.0%" ) & " of customers bought once; repeat buyers are "
+				    & FORMAT ( [Repeat Customer Rate], "0.0%" ) & " of the base"
+				```
+			displayFolder: Customers
+
+		column customer_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: customer_key
+
+		column customer_state
+			dataType: string
+			summarizeBy: none
+			sourceColumn: customer_state
+
+		column customer_city
+			dataType: string
+			summarizeBy: none
+			sourceColumn: customer_city
+
+		column first_order_date
+			dataType: dateTime
+			formatString: yyyy-mm-dd
+			summarizeBy: none
+			sourceColumn: first_order_date
+
+		column last_order_date
+			dataType: dateTime
+			formatString: yyyy-mm-dd
+			summarizeBy: none
+			sourceColumn: last_order_date
+
+		column total_orders
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: total_orders
+
+		column lifetime_gmv
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: lifetime_gmv
+
+		column state_name
+			dataType: string
+			summarizeBy: none
+			sourceColumn: state_name
+
+		column region
+			dataType: string
+			summarizeBy: none
+			sourceColumn: region
+
+		column cohort_month
+			dataType: dateTime
+			formatString: yyyy-mm
+			summarizeBy: none
+			sourceColumn: cohort_month
+
+		column is_repeat_customer
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_repeat_customer
+
+		column recency_days
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: recency_days
+
+		column rfm_segment
+			dataType: string
+			summarizeBy: none
+			sourceColumn: rfm_segment
+			sortByColumn: rfm_segment_sort
+
+		column rfm_segment_sort
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: rfm_segment_sort
+
+		column value_band
+			dataType: string
+			summarizeBy: none
+			sourceColumn: value_band
+			sortByColumn: value_band_sort
+
+		column value_band_sort
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: value_band_sort
+
+		partition dim_customer = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/dim_customer.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"customer_key", Int64.Type}, {"customer_state", type text}, {"customer_city", type text}, {"first_order_date", type date}, {"last_order_date", type date}, {"total_orders", Int64.Type}, {"lifetime_gmv", type number}, {"state_name", type text}, {"region", type text}, {"cohort_month", type date}, {"is_repeat_customer", Int64.Type}, {"recency_days", Int64.Type}, {"rfm_segment", type text}, {"rfm_segment_sort", Int64.Type}, {"value_band", type text}, {"value_band_sort", Int64.Type}}, "en-US")
+					in
+						Typed
+
+	table dim_product
+
+		column product_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: product_key
+
+		column category
+			dataType: string
+			summarizeBy: none
+			sourceColumn: category
+
+		column category_group
+			dataType: string
+			summarizeBy: none
+			sourceColumn: category_group
+
+		column size_band
+			dataType: string
+			summarizeBy: none
+			sourceColumn: size_band
+			sortByColumn: size_band_sort
+
+		column size_band_sort
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: size_band_sort
+
+		column weight_g
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: weight_g
+
+		column volume_cm3
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: volume_cm3
+
+		column photos_qty
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: photos_qty
+
+		column description_length
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: description_length
+
+		partition dim_product = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/dim_product.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"product_key", Int64.Type}, {"category", type text}, {"category_group", type text}, {"size_band", type text}, {"size_band_sort", Int64.Type}, {"weight_g", Int64.Type}, {"volume_cm3", Int64.Type}, {"photos_qty", Int64.Type}, {"description_length", Int64.Type}}, "en-US")
+					in
+						Typed
+
+	table dim_seller
+
+		measure 'Active Sellers' = DISTINCTCOUNT ( fct_order_items[seller_key] )
+			formatString: #,0
+			displayFolder: Sellers
+
+		measure 'GMV per Seller' = DIVIDE ( [GMV], [Active Sellers] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sellers
+
+		measure 'Top 10% Seller GMV Share' = DIVIDE ( CALCULATE ( [GMV], dim_seller[seller_tier] IN { "Top 1%", "Top 2-10%" } ), [GMV] )
+			formatString: 0.0%
+			displayFolder: Sellers
+
+		measure 'Late Delivery % (items view)' = CALCULATE ( [Late Delivery %], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.0%
+			displayFolder: Sellers
+
+		measure 'Avg Review (items view)' = CALCULATE ( [Avg Review Score], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.00
+			displayFolder: Sellers
+
+		measure 'Avg Handling Days (items view)' = CALCULATE ( [Avg Seller Handling Days], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.00
+			displayFolder: Sellers
+
+		column seller_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: seller_key
+
+		column seller_label
+			dataType: string
+			summarizeBy: none
+			sourceColumn: seller_label
+
+		column seller_city
+			dataType: string
+			summarizeBy: none
+			sourceColumn: seller_city
+
+		column seller_state
+			dataType: string
+			summarizeBy: none
+			sourceColumn: seller_state
+
+		column state_name
+			dataType: string
+			summarizeBy: none
+			sourceColumn: state_name
+
+		column region
+			dataType: string
+			summarizeBy: none
+			sourceColumn: region
+
+		column first_sale_date
+			dataType: dateTime
+			formatString: yyyy-mm-dd
+			summarizeBy: none
+			sourceColumn: first_sale_date
+
+		column seller_tier
+			dataType: string
+			summarizeBy: none
+			sourceColumn: seller_tier
+			sortByColumn: seller_tier_sort
+
+		column seller_tier_sort
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: seller_tier_sort
+
+		column seller_gmv
+			dataType: double
+			formatString: \R\$ #,0
+			summarizeBy: sum
+			sourceColumn: seller_gmv
+
+		partition dim_seller = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/dim_seller.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"seller_key", Int64.Type}, {"seller_label", type text}, {"seller_city", type text}, {"seller_state", type text}, {"state_name", type text}, {"region", type text}, {"first_sale_date", type date}, {"seller_tier", type text}, {"seller_tier_sort", Int64.Type}, {"seller_gmv", type number}}, "en-US")
+					in
+						Typed
+
+	table fct_orders
+
+		measure 'Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 0 )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'All Orders' = COUNTROWS ( fct_orders )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Canceled Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 1 )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Cancellation Rate' = DIVIDE ( [Canceled Orders], [All Orders] )
+			formatString: 0.0%
+			displayFolder: Orders
+
+		measure 'Orders PY' = CALCULATE ( [Orders], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Orders YoY %' = ```
+				VAR py = [Orders PY]
+				RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [Orders] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Orders
+
+		measure 'Delivered Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_delivered] = 1 )
+			formatString: #,0
+			displayFolder: Delivery
+
+		measure 'Late Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_late] = 1 )
+			formatString: #,0
+			displayFolder: Delivery
+
+		measure 'Late Delivery %' = DIVIDE ( [Late Orders], [Delivered Orders] )
+			formatString: 0.0%
+			displayFolder: Delivery
+
+		measure 'On-Time Delivery %' = DIVIDE ( [Delivered Orders] - [Late Orders], [Delivered Orders] )
+			formatString: 0.0%
+			displayFolder: Delivery
+
+		measure 'Avg Delivery Days' = CALCULATE ( AVERAGE ( fct_orders[delivery_days] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Promised Days' = CALCULATE ( AVERAGE ( fct_orders[promised_days] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Days Early vs Promise' = - CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Days Late (late orders)' = CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_late] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Seller Handling Days' = AVERAGE ( fct_orders[seller_to_carrier_days] )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Carrier Transit Days' = AVERAGE ( fct_orders[carrier_to_customer_days] )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Same-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Cross-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] == 0 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Review Score' = AVERAGE ( fct_orders[review_score] )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Reviews' = COUNT ( fct_orders[review_score] )
+			formatString: #,0
+			displayFolder: Customer Experience
+
+		measure '5-Star %' = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] = 5 ), [Reviews] )
+			formatString: 0.0%
+			displayFolder: Customer Experience
+
+		measure '1-2 Star %' = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] <= 2 ), [Reviews] )
+			formatString: 0.0%
+			displayFolder: Customer Experience
+
+		measure 'Avg Review On Time' = CALCULATE ( [Avg Review Score], fct_orders[is_late] == 0 )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Avg Review Late' = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 1 )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Late Review Penalty' = [Avg Review On Time] - [Avg Review Late]
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Delivery Insight' = ```
+				"Late orders score " & FORMAT ( [Avg Review Late], "0.0" ) & " stars vs " & FORMAT ( [Avg Review On Time], "0.0" )
+				    & " on time; " & FORMAT ( [Late Delivery %], "0.0%" ) & " of deliveries miss the promised date"
+				```
+			displayFolder: Customer Experience
+
+		column order_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: order_key
+
+		column customer_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: customer_key
+
+		column date_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: date_key
+
+		column order_status
+			dataType: string
+			summarizeBy: none
+			sourceColumn: order_status
+
+		column is_canceled
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_canceled
+
+		column is_delivered
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_delivered
+
+		column items_count
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: items_count
+
+		column sellers_count
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: sellers_count
+
+		column merchandise_value
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: merchandise_value
+
+		column freight_value
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: freight_value
+
+		column payment_value
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: payment_value
+
+		column payment_type
+			dataType: string
+			summarizeBy: none
+			sourceColumn: payment_type
+
+		column installments
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: installments
+
+		column purchase_hour
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: purchase_hour
+
+		column approval_hours
+			dataType: double
+			formatString: 0.0
+			summarizeBy: none
+			sourceColumn: approval_hours
+
+		column seller_to_carrier_days
+			dataType: double
+			formatString: 0.0
+			summarizeBy: none
+			sourceColumn: seller_to_carrier_days
+
+		column carrier_to_customer_days
+			dataType: double
+			formatString: 0.0
+			summarizeBy: none
+			sourceColumn: carrier_to_customer_days
+
+		column delivery_days
+			dataType: double
+			formatString: 0.0
+			summarizeBy: none
+			sourceColumn: delivery_days
+
+		column promised_days
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: promised_days
+
+		column days_vs_estimate
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: days_vs_estimate
+
+		column is_late
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_late
+
+		column delivery_status
+			dataType: string
+			summarizeBy: none
+			sourceColumn: delivery_status
+			sortByColumn: delivery_status_sort
+
+		column delivery_status_sort
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: delivery_status_sort
+
+		column customer_state
+			dataType: string
+			summarizeBy: none
+			sourceColumn: customer_state
+
+		column seller_state
+			dataType: string
+			summarizeBy: none
+			sourceColumn: seller_state
+
+		column is_same_state
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_same_state
+
+		column review_score
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: review_score
+
+		column has_review_comment
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: has_review_comment
+
+		column customer_order_seq
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: customer_order_seq
+
+		column is_first_order
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: is_first_order
+
+		column months_since_first_order
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: months_since_first_order
+
+		partition fct_orders = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/fct_orders.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"order_key", Int64.Type}, {"customer_key", Int64.Type}, {"date_key", Int64.Type}, {"order_status", type text}, {"is_canceled", Int64.Type}, {"is_delivered", Int64.Type}, {"items_count", Int64.Type}, {"sellers_count", Int64.Type}, {"merchandise_value", type number}, {"freight_value", type number}, {"payment_value", type number}, {"payment_type", type text}, {"installments", Int64.Type}, {"purchase_hour", Int64.Type}, {"approval_hours", type number}, {"seller_to_carrier_days", type number}, {"carrier_to_customer_days", type number}, {"delivery_days", type number}, {"promised_days", Int64.Type}, {"days_vs_estimate", Int64.Type}, {"is_late", Int64.Type}, {"delivery_status", type text}, {"delivery_status_sort", Int64.Type}, {"customer_state", type text}, {"seller_state", type text}, {"is_same_state", Int64.Type}, {"review_score", Int64.Type}, {"has_review_comment", Int64.Type}, {"customer_order_seq", Int64.Type}, {"is_first_order", Int64.Type}, {"months_since_first_order", Int64.Type}}, "en-US")
+					in
+						Typed
+
+	table fct_order_items
+
+		measure 'GMV' = SUM ( fct_order_items[price] )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Freight Revenue' = SUM ( fct_order_items[freight_value] )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Items Sold' = COUNTROWS ( fct_order_items )
+			formatString: #,0
+			displayFolder: Sales
+
+		measure 'Ordered Baskets' = DISTINCTCOUNT ( fct_order_items[order_key] )
+			formatString: #,0
+			displayFolder: Sales
+
+		measure 'AOV' = DIVIDE ( [GMV], [Ordered Baskets] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sales
+
+		measure 'Avg Item Price' = DIVIDE ( [GMV], [Items Sold] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sales
+
+		measure 'Items per Order' = DIVIDE ( [Items Sold], [Ordered Baskets] )
+			formatString: 0.00
+			displayFolder: Sales
+
+		measure 'Freight % of GMV' = DIVIDE ( [Freight Revenue], [GMV] )
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV PY' = CALCULATE ( [GMV], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'GMV YoY %' = ```
+				VAR py = [GMV PY]
+				RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [GMV] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV PM' = CALCULATE ( [GMV], DATEADD ( dim_date[date], -1, MONTH ), REMOVEFILTERS ( dim_date ) )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'GMV MoM %' = ```
+				VAR pm = [GMV PM]
+				RETURN IF ( NOT ISBLANK ( pm ), DIVIDE ( [GMV] - pm, pm ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV 3M Avg' = ```
+				VAR lastDay = MAX ( dim_date[date] )
+				RETURN CALCULATE ( [GMV], DATESINPERIOD ( dim_date[date], lastDay, -3, MONTH ), REMOVEFILTERS ( dim_date ) ) / 3
+				```
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Category Share %' = DIVIDE ( [GMV], CALCULATE ( [GMV], REMOVEFILTERS ( dim_product ) ) )
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'Category Cumulative %' = ```
+				VAR cur = [GMV]
+				VAR cats = ADDCOLUMNS ( ALLSELECTED ( dim_product[category] ), "@gmv", [GMV] )
+				RETURN DIVIDE ( SUMX ( FILTER ( cats, [@gmv] >= cur ), [@gmv] ), SUMX ( cats, [@gmv] ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'Category Rank' = IF ( NOT ISBLANK ( [GMV] ), RANKX ( ALLSELECTED ( dim_product[category] ), [GMV] ) )
+			formatString: 0
+			displayFolder: Sales
+
+		column order_line_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: order_line_key
+
+		column order_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: order_key
+
+		column order_item_id
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: order_item_id
+
+		column product_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: product_key
+
+		column seller_key
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: seller_key
+
+		column price
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: price
+
+		column freight_value
+			dataType: double
+			formatString: \R\$ #,0.00
+			summarizeBy: sum
+			sourceColumn: freight_value
+
+		partition fct_order_items = m
+			mode: import
+			source =
+					let
+						Source = Csv.Document(Web.Contents("https://raw.githubusercontent.com", [RelativePath = "Ajay0704/ecommerce-powerbi/main/data/model/fct_order_items.csv"]), [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+						Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+						Typed = Table.TransformColumnTypes(Headers, {{"order_line_key", Int64.Type}, {"order_key", Int64.Type}, {"order_item_id", Int64.Type}, {"product_key", Int64.Type}, {"seller_key", Int64.Type}, {"price", type number}, {"freight_value", type number}}, "en-US")
+					in
+						Typed
+
+	ref table fct_payments
+
+		measure 'Payment Value' = SUM ( fct_payments[payment_value] )
+			formatString: \R\$ #,0
+			displayFolder: Payments
+
+		measure 'Payment Share %' = DIVIDE ( [Payment Value], CALCULATE ( [Payment Value], REMOVEFILTERS ( fct_payments[payment_type] ) ) )
+			formatString: 0.0%
+			displayFolder: Payments
+
+		measure 'Avg Installments (Credit Card)' = CALCULATE ( AVERAGE ( fct_payments[payment_installments] ), fct_payments[payment_type] = "Credit Card" )
+			formatString: 0.00
+			displayFolder: Payments
+
+		measure 'Installment Share (Credit Card)' = ```
+				DIVIDE (
+				    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card", fct_payments[payment_installments] >= 2 ),
+				    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card" )
+				)
+				```
+			formatString: 0.0%
+			displayFolder: Payments
+
+	relationship fct_orders_date_key__dim_date
+		fromColumn: fct_orders.date_key
+		toColumn: dim_date.date_key
+
+	relationship fct_orders_customer_key__dim_customer
+		fromColumn: fct_orders.customer_key
+		toColumn: dim_customer.customer_key
+
+	relationship fct_order_items_order_key__fct_orders
+		fromColumn: fct_order_items.order_key
+		toColumn: fct_orders.order_key
+
+	relationship fct_order_items_product_key__dim_product
+		fromColumn: fct_order_items.product_key
+		toColumn: dim_product.product_key
+
+	relationship fct_order_items_seller_key__dim_seller
+		fromColumn: fct_order_items.seller_key
+		toColumn: dim_seller.seller_key
+
+	relationship fct_payments_order_key__fct_orders
+		fromColumn: fct_payments.order_key
+		toColumn: fct_orders.order_key
+

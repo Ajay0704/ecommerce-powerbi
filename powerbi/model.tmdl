@@ -176,7 +176,7 @@ createOrReplace
 			formatString: 0.00
 			displayFolder: Delivery
 
-		measure 'Cross-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 0 )
+		measure 'Cross-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] == 0 )
 			formatString: 0.00
 			displayFolder: Delivery
 
@@ -196,7 +196,7 @@ createOrReplace
 			formatString: 0.0%
 			displayFolder: Customer Experience
 
-		measure 'Avg Review On Time' = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 0 )
+		measure 'Avg Review On Time' = CALCULATE ( [Avg Review Score], fct_orders[is_late] == 0 )
 			formatString: 0.00
 			displayFolder: Customer Experience
 
