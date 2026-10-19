@@ -119,7 +119,7 @@ python3 powerbi/gen_report.py         # -> powerbi/report/ (PBIR; publish via Fa
 pipeline/     build_model.py, reference_kpis.py
 data/model/   star-schema CSVs (the Power BI source)
 powerbi/      measures.dax (source of truth), gen_tmdl.py, model*.tmdl, gen_report.py, report/ (PBIR)
-docs/         reconciliation.md, reference_kpis.json, screenshots/
+docs/         reconciliation.md, build_notes.md, reference_kpis.json, screenshots/
 ```
 
 *Dataset: Olist, "Brazilian E-Commerce Public Dataset by Olist", Kaggle, CC BY-NC-SA 4.0. This repository is a
