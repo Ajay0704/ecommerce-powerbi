@@ -1,0 +1,4 @@
+data/raw/
+__pycache__/
+.DS_Store
+powerbi/onedrive_url.txt

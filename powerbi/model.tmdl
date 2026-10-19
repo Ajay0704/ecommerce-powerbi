@@ -1,0 +1,305 @@
+createOrReplace
+
+	relationship fct_orders_date_key__dim_date
+		fromColumn: fct_orders.date_key
+		toColumn: dim_date.date_key
+
+	relationship fct_orders_customer_key__dim_customer
+		fromColumn: fct_orders.customer_key
+		toColumn: dim_customer.customer_key
+
+	relationship fct_order_items_order_key__fct_orders
+		fromColumn: fct_order_items.order_key
+		toColumn: fct_orders.order_key
+
+	relationship fct_order_items_product_key__dim_product
+		fromColumn: fct_order_items.product_key
+		toColumn: dim_product.product_key
+
+	relationship fct_order_items_seller_key__dim_seller
+		fromColumn: fct_order_items.seller_key
+		toColumn: dim_seller.seller_key
+
+	relationship fct_payments_order_key__fct_orders
+		fromColumn: fct_payments.order_key
+		toColumn: fct_orders.order_key
+
+	ref table fct_order_items
+
+		measure 'GMV' = SUM ( fct_order_items[price] )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Freight Revenue' = SUM ( fct_order_items[freight_value] )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Items Sold' = COUNTROWS ( fct_order_items )
+			formatString: #,0
+			displayFolder: Sales
+
+		measure 'Ordered Baskets' = DISTINCTCOUNT ( fct_order_items[order_key] )
+			formatString: #,0
+			displayFolder: Sales
+
+		measure 'AOV' = DIVIDE ( [GMV], [Ordered Baskets] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sales
+
+		measure 'Avg Item Price' = DIVIDE ( [GMV], [Items Sold] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sales
+
+		measure 'Items per Order' = DIVIDE ( [Items Sold], [Ordered Baskets] )
+			formatString: 0.00
+			displayFolder: Sales
+
+		measure 'Freight % of GMV' = DIVIDE ( [Freight Revenue], [GMV] )
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV PY' = CALCULATE ( [GMV], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'GMV YoY %' = ```
+				VAR py = [GMV PY]
+				RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [GMV] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV PM' = CALCULATE ( [GMV], DATEADD ( dim_date[date], -1, MONTH ), REMOVEFILTERS ( dim_date ) )
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'GMV MoM %' = ```
+				VAR pm = [GMV PM]
+				RETURN IF ( NOT ISBLANK ( pm ), DIVIDE ( [GMV] - pm, pm ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV 3M Avg' = ```
+				VAR lastDay = MAX ( dim_date[date] )
+				RETURN CALCULATE ( [GMV], DATESINPERIOD ( dim_date[date], lastDay, -3, MONTH ), REMOVEFILTERS ( dim_date ) ) / 3
+				```
+			formatString: \R\$ #,0
+			displayFolder: Sales
+
+		measure 'Category Share %' = DIVIDE ( [GMV], CALCULATE ( [GMV], REMOVEFILTERS ( dim_product ) ) )
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'Category Cumulative %' = ```
+				VAR cur = [GMV]
+				VAR cats = ADDCOLUMNS ( ALLSELECTED ( dim_product[category] ), "@gmv", [GMV] )
+				RETURN DIVIDE ( SUMX ( FILTER ( cats, [@gmv] >= cur ), [@gmv] ), SUMX ( cats, [@gmv] ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'Category Rank' = IF ( NOT ISBLANK ( [GMV] ), RANKX ( ALLSELECTED ( dim_product[category] ), [GMV] ) )
+			formatString: 0
+			displayFolder: Sales
+
+	ref table fct_orders
+
+		measure 'Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 0 )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'All Orders' = COUNTROWS ( fct_orders )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Canceled Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 1 )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Cancellation Rate' = DIVIDE ( [Canceled Orders], [All Orders] )
+			formatString: 0.0%
+			displayFolder: Orders
+
+		measure 'Orders PY' = CALCULATE ( [Orders], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+			formatString: #,0
+			displayFolder: Orders
+
+		measure 'Orders YoY %' = ```
+				VAR py = [Orders PY]
+				RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [Orders] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Orders
+
+		measure 'Delivered Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_delivered] = 1 )
+			formatString: #,0
+			displayFolder: Delivery
+
+		measure 'Late Orders' = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_late] = 1 )
+			formatString: #,0
+			displayFolder: Delivery
+
+		measure 'Late Delivery %' = DIVIDE ( [Late Orders], [Delivered Orders] )
+			formatString: 0.0%
+			displayFolder: Delivery
+
+		measure 'On-Time Delivery %' = DIVIDE ( [Delivered Orders] - [Late Orders], [Delivered Orders] )
+			formatString: 0.0%
+			displayFolder: Delivery
+
+		measure 'Avg Delivery Days' = CALCULATE ( AVERAGE ( fct_orders[delivery_days] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Promised Days' = CALCULATE ( AVERAGE ( fct_orders[promised_days] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Days Early vs Promise' = - CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_delivered] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Days Late (late orders)' = CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_late] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Seller Handling Days' = AVERAGE ( fct_orders[seller_to_carrier_days] )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Carrier Transit Days' = AVERAGE ( fct_orders[carrier_to_customer_days] )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Same-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 1 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Cross-State Delivery Days' = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 0 )
+			formatString: 0.00
+			displayFolder: Delivery
+
+		measure 'Avg Review Score' = AVERAGE ( fct_orders[review_score] )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Reviews' = COUNT ( fct_orders[review_score] )
+			formatString: #,0
+			displayFolder: Customer Experience
+
+		measure '5-Star %' = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] = 5 ), [Reviews] )
+			formatString: 0.0%
+			displayFolder: Customer Experience
+
+		measure '1-2 Star %' = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] <= 2 ), [Reviews] )
+			formatString: 0.0%
+			displayFolder: Customer Experience
+
+		measure 'Avg Review On Time' = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 0 )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Avg Review Late' = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 1 )
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Late Review Penalty' = [Avg Review On Time] - [Avg Review Late]
+			formatString: 0.00
+			displayFolder: Customer Experience
+
+		measure 'Delivery Insight' = ```
+				"Late orders score " & FORMAT ( [Avg Review Late], "0.0" ) & " stars vs " & FORMAT ( [Avg Review On Time], "0.0" )
+				    & " on time; " & FORMAT ( [Late Delivery %], "0.0%" ) & " of deliveries miss the promised date"
+				```
+			displayFolder: Customer Experience
+
+	ref table dim_customer
+
+		measure 'Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'New Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_first_order] = 1 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Returning Customers' = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0, fct_orders[is_first_order] = 0 )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Repeat Order %' = DIVIDE ( CALCULATE ( [Orders], fct_orders[is_first_order] = 0 ), [Orders] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Customer Count' = COUNTROWS ( dim_customer )
+			formatString: #,0
+			displayFolder: Customers
+
+		measure 'Repeat Customer Rate' = DIVIDE ( CALCULATE ( [Customer Count], dim_customer[is_repeat_customer] = 1 ), [Customer Count] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Avg Lifetime GMV' = AVERAGE ( dim_customer[lifetime_gmv] )
+			formatString: \R\$ #,0.00
+			displayFolder: Customers
+
+		measure 'Retention %' = DIVIDE ( [Customers], [Customer Count] )
+			formatString: 0.0%
+			displayFolder: Customers
+
+		measure 'Customer Insight' = ```
+				FORMAT ( 1 - [Repeat Customer Rate], "0.0%" ) & " of customers bought once; repeat buyers are "
+				    & FORMAT ( [Repeat Customer Rate], "0.0%" ) & " of the base"
+				```
+			displayFolder: Customers
+
+	ref table dim_seller
+
+		measure 'Active Sellers' = DISTINCTCOUNT ( fct_order_items[seller_key] )
+			formatString: #,0
+			displayFolder: Sellers
+
+		measure 'GMV per Seller' = DIVIDE ( [GMV], [Active Sellers] )
+			formatString: \R\$ #,0.00
+			displayFolder: Sellers
+
+		measure 'Top 10% Seller GMV Share' = DIVIDE ( CALCULATE ( [GMV], dim_seller[seller_tier] IN { "Top 1%", "Top 2-10%" } ), [GMV] )
+			formatString: 0.0%
+			displayFolder: Sellers
+
+		measure 'Late Delivery % (items view)' = CALCULATE ( [Late Delivery %], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.0%
+			displayFolder: Sellers
+
+		measure 'Avg Review (items view)' = CALCULATE ( [Avg Review Score], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.00
+			displayFolder: Sellers
+
+		measure 'Avg Handling Days (items view)' = CALCULATE ( [Avg Seller Handling Days], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+			formatString: 0.00
+			displayFolder: Sellers
+
+	ref table fct_payments
+
+		measure 'Payment Value' = SUM ( fct_payments[payment_value] )
+			formatString: \R\$ #,0
+			displayFolder: Payments
+
+		measure 'Payment Share %' = DIVIDE ( [Payment Value], CALCULATE ( [Payment Value], REMOVEFILTERS ( fct_payments[payment_type] ) ) )
+			formatString: 0.0%
+			displayFolder: Payments
+
+		measure 'Avg Installments (Credit Card)' = CALCULATE ( AVERAGE ( fct_payments[payment_installments] ), fct_payments[payment_type] = "Credit Card" )
+			formatString: 0.00
+			displayFolder: Payments
+
+		measure 'Installment Share (Credit Card)' = ```
+				DIVIDE (
+				    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card", fct_payments[payment_installments] >= 2 ),
+				    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card" )
+				)
+				```
+			formatString: 0.0%
+			displayFolder: Payments
+

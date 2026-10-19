@@ -1,0 +1,161 @@
+// Olist e-commerce semantic model: every measure, grouped by display folder.
+// gen_tmdl.py turns this file into TMDL (home table per folder, format strings).
+// Rules: GMV = item price of non-cancelled orders (freight reported separately).
+// Time intelligence removes dim_date filters explicitly, so it works whether or not dim_date is marked as a date table.
+
+// ---------- Sales ----------
+GMV = SUM ( fct_order_items[price] )
+
+Freight Revenue = SUM ( fct_order_items[freight_value] )
+
+Items Sold = COUNTROWS ( fct_order_items )
+
+Ordered Baskets = DISTINCTCOUNT ( fct_order_items[order_key] )
+
+AOV = DIVIDE ( [GMV], [Ordered Baskets] )
+
+Avg Item Price = DIVIDE ( [GMV], [Items Sold] )
+
+Items per Order = DIVIDE ( [Items Sold], [Ordered Baskets] )
+
+Freight % of GMV = DIVIDE ( [Freight Revenue], [GMV] )
+
+GMV PY =
+CALCULATE ( [GMV], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+
+GMV YoY % =
+VAR py = [GMV PY]
+RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [GMV] - py, py ) )
+
+GMV PM =
+CALCULATE ( [GMV], DATEADD ( dim_date[date], -1, MONTH ), REMOVEFILTERS ( dim_date ) )
+
+GMV MoM % =
+VAR pm = [GMV PM]
+RETURN IF ( NOT ISBLANK ( pm ), DIVIDE ( [GMV] - pm, pm ) )
+
+GMV 3M Avg =
+VAR lastDay = MAX ( dim_date[date] )
+RETURN CALCULATE ( [GMV], DATESINPERIOD ( dim_date[date], lastDay, -3, MONTH ), REMOVEFILTERS ( dim_date ) ) / 3
+
+Category Share % = DIVIDE ( [GMV], CALCULATE ( [GMV], REMOVEFILTERS ( dim_product ) ) )
+
+Category Cumulative % =
+VAR cur = [GMV]
+VAR cats = ADDCOLUMNS ( ALLSELECTED ( dim_product[category] ), "@gmv", [GMV] )
+RETURN DIVIDE ( SUMX ( FILTER ( cats, [@gmv] >= cur ), [@gmv] ), SUMX ( cats, [@gmv] ) )
+
+Category Rank = IF ( NOT ISBLANK ( [GMV] ), RANKX ( ALLSELECTED ( dim_product[category] ), [GMV] ) )
+
+// ---------- Orders ----------
+Orders = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 0 )
+
+All Orders = COUNTROWS ( fct_orders )
+
+Canceled Orders = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_canceled] = 1 )
+
+Cancellation Rate = DIVIDE ( [Canceled Orders], [All Orders] )
+
+Orders PY =
+CALCULATE ( [Orders], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+
+Orders YoY % =
+VAR py = [Orders PY]
+RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [Orders] - py, py ) )
+
+// ---------- Delivery ----------
+Delivered Orders = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_delivered] = 1 )
+
+Late Orders = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_late] = 1 )
+
+Late Delivery % = DIVIDE ( [Late Orders], [Delivered Orders] )
+
+On-Time Delivery % = DIVIDE ( [Delivered Orders] - [Late Orders], [Delivered Orders] )
+
+Avg Delivery Days = CALCULATE ( AVERAGE ( fct_orders[delivery_days] ), fct_orders[is_delivered] = 1 )
+
+Avg Promised Days = CALCULATE ( AVERAGE ( fct_orders[promised_days] ), fct_orders[is_delivered] = 1 )
+
+Avg Days Early vs Promise = - CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_delivered] = 1 )
+
+Avg Days Late (late orders) = CALCULATE ( AVERAGE ( fct_orders[days_vs_estimate] ), fct_orders[is_late] = 1 )
+
+Avg Seller Handling Days = AVERAGE ( fct_orders[seller_to_carrier_days] )
+
+Avg Carrier Transit Days = AVERAGE ( fct_orders[carrier_to_customer_days] )
+
+Same-State Delivery Days = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 1 )
+
+Cross-State Delivery Days = CALCULATE ( [Avg Delivery Days], fct_orders[is_same_state] = 0 )
+
+// ---------- Customer Experience ----------
+Avg Review Score = AVERAGE ( fct_orders[review_score] )
+
+Reviews = COUNT ( fct_orders[review_score] )
+
+5-Star % = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] = 5 ), [Reviews] )
+
+1-2 Star % = DIVIDE ( CALCULATE ( [Reviews], fct_orders[review_score] <= 2 ), [Reviews] )
+
+Avg Review On Time = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 0 )
+
+Avg Review Late = CALCULATE ( [Avg Review Score], fct_orders[is_late] = 1 )
+
+Late Review Penalty = [Avg Review On Time] - [Avg Review Late]
+
+Delivery Insight =
+"Late orders score " & FORMAT ( [Avg Review Late], "0.0" ) & " stars vs " & FORMAT ( [Avg Review On Time], "0.0" )
+    & " on time; " & FORMAT ( [Late Delivery %], "0.0%" ) & " of deliveries miss the promised date"
+
+// ---------- Customers ----------
+Customers = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0 )
+
+New Customers = CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_first_order] = 1 )
+
+Returning Customers =
+CALCULATE ( DISTINCTCOUNT ( fct_orders[customer_key] ), fct_orders[is_canceled] = 0, fct_orders[is_first_order] = 0 )
+
+Repeat Order % = DIVIDE ( CALCULATE ( [Orders], fct_orders[is_first_order] = 0 ), [Orders] )
+
+Customer Count = COUNTROWS ( dim_customer )
+
+Repeat Customer Rate = DIVIDE ( CALCULATE ( [Customer Count], dim_customer[is_repeat_customer] = 1 ), [Customer Count] )
+
+Avg Lifetime GMV = AVERAGE ( dim_customer[lifetime_gmv] )
+
+Retention % = DIVIDE ( [Customers], [Customer Count] )
+
+Customer Insight =
+FORMAT ( 1 - [Repeat Customer Rate], "0.0%" ) & " of customers bought once; repeat buyers are "
+    & FORMAT ( [Repeat Customer Rate], "0.0%" ) & " of the base"
+
+// ---------- Sellers ----------
+Active Sellers = DISTINCTCOUNT ( fct_order_items[seller_key] )
+
+GMV per Seller = DIVIDE ( [GMV], [Active Sellers] )
+
+Top 10% Seller GMV Share =
+DIVIDE ( CALCULATE ( [GMV], dim_seller[seller_tier] IN { "Top 1%", "Top 2-10%" } ), [GMV] )
+
+Late Delivery % (items view) =
+CALCULATE ( [Late Delivery %], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+
+Avg Review (items view) =
+CALCULATE ( [Avg Review Score], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+
+Avg Handling Days (items view) =
+CALCULATE ( [Avg Seller Handling Days], CROSSFILTER ( fct_order_items[order_key], fct_orders[order_key], BOTH ) )
+
+// ---------- Payments ----------
+Payment Value = SUM ( fct_payments[payment_value] )
+
+Payment Share % = DIVIDE ( [Payment Value], CALCULATE ( [Payment Value], REMOVEFILTERS ( fct_payments[payment_type] ) ) )
+
+Avg Installments (Credit Card) =
+CALCULATE ( AVERAGE ( fct_payments[payment_installments] ), fct_payments[payment_type] = "Credit Card" )
+
+Installment Share (Credit Card) =
+DIVIDE (
+    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card", fct_payments[payment_installments] >= 2 ),
+    CALCULATE ( COUNTROWS ( fct_payments ), fct_payments[payment_type] = "Credit Card" )
+)

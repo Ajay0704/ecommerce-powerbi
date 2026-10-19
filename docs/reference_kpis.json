@@ -1,0 +1,92 @@
+{
+  "GMV": 13449529.680000002,
+  "Freight Revenue": 2238866.9599999995,
+  "Orders": 97910,
+  "Orders (with items)": 97905,
+  "AOV": 137.37326673816457,
+  "Items Sold": 111752,
+  "Customers": 94707,
+  "Cancellation Rate": 0.011928309046138941,
+  "Avg Review Score": 4.088508085019831,
+  "On-Time Delivery %": 0.932112304190098,
+  "Late Delivery %": 0.06788769580990198,
+  "Avg Delivery Days": 12.538459476315706,
+  "Avg Promised Days": 24.284793613504775,
+  "Avg Review (on time)": 4.291045278195152,
+  "Avg Review (late)": 2.270931326434619,
+  "Repeat Customer Rate": 0.030356784609374174,
+  "Freight % of GMV": 0.16646433096685054,
+  "Active Sellers": 3029,
+  "Payment Value": 15944480.569999998,
+  "GMV Jan-Aug 2018": 7341037.410000001,
+  "GMV Jan-Aug 2017": 3080850.81,
+  "GMV YoY % (Jan-Aug)": 1.382795488237225,
+  "GMV 2017": 6108492.2700000005,
+  "GMV 2017-11-24": 152653.74,
+  "Orders 2017-11-24": 1166.0,
+  "Top category": "Health beauty",
+  "Top category share": 0.09302522614307505,
+  "Categories for 80% GMV": 18,
+  "Categories": 74,
+  "Category groups": {
+    "Home & Furniture": 0.2134,
+    "Electronics & Tech": 0.1397,
+    "Sports & Leisure": 0.1347,
+    "Health & Beauty": 0.1223,
+    "Tools, Garden & Auto": 0.115,
+    "Fashion & Accessories": 0.1141,
+    "Baby, Kids & Toys": 0.0658,
+    "Appliances": 0.0359,
+    "Books, Media & Office": 0.023,
+    "Food, Drink & Pets": 0.0228,
+    "Other / Uncategorized": 0.0133
+  },
+  "GMV share by seller tier": {
+    "Bottom 50%": 0.0328,
+    "Top 1%": 0.2578,
+    "Top 11-50%": 0.2942,
+    "Top 2-10%": 0.4153
+  },
+  "Avg delivery days by region": {
+    "Central-West": 15.0,
+    "North": 22.6,
+    "Northeast": 20.0,
+    "South": 14.0,
+    "Southeast": 10.7
+  },
+  "Late % by region": {
+    "Central-West": 0.0651,
+    "North": 0.0859,
+    "Northeast": 0.1276,
+    "South": 0.0592,
+    "Southeast": 0.0613
+  },
+  "Same-state avg delivery days": 7.919805217692774,
+  "Cross-state avg delivery days": 15.134099675271962,
+  "Review by delivery status": {
+    "1-3 days late": 3.29,
+    "4-7 days late": 2.1,
+    "8+ days late": 1.7,
+    "On time": 4.29
+  },
+  "1-2 star % (late)": 0.6094013167968152,
+  "1-2 star % (on time)": 0.09197965920242662,
+  "Payment share by type": {
+    "Boleto": 0.1794,
+    "Credit Card": 0.7836,
+    "Debit Card": 0.0137,
+    "Voucher": 0.0234
+  },
+  "Avg installments (credit card)": 3.5043835007904676,
+  "% credit-card payments in 2+ installments": 0.6681604975371389,
+  "RFM segments": {
+    "One-timer, cooling": 40504,
+    "Dormant (1 yr+)": 20847,
+    "New (last 90 days)": 17641,
+    "High-value one-timer": 12840,
+    "Lapsed repeat": 1636,
+    "Loyal repeat": 1239
+  },
+  "Repeat customers GMV share": 0.055552329916119414,
+  "Customers returning within 3 months": 0.009270698047662791
+}
