@@ -1,0 +1,123 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.13.0/schema.json",
+  "name": "191ad95d7901c4e10e89",
+  "position": {
+    "x": 16,
+    "y": 80,
+    "z": 3,
+    "height": 104,
+    "width": 1248,
+    "tabOrder": 3
+  },
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Data": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "Active Sellers"
+                }
+              },
+              "queryRef": "dim_seller.Active Sellers",
+              "nativeQueryRef": "Active Sellers"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "GMV per Seller"
+                }
+              },
+              "queryRef": "dim_seller.GMV per Seller",
+              "nativeQueryRef": "GMV per Seller"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "Top 10% Seller GMV Share"
+                }
+              },
+              "queryRef": "dim_seller.Top 10% Seller GMV Share",
+              "nativeQueryRef": "Top 10% Seller GMV Share"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "Avg Handling Days (items view)"
+                }
+              },
+              "queryRef": "dim_seller.Avg Handling Days (items view)",
+              "nativeQueryRef": "Avg Handling Days (items view)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "Late Delivery % (items view)"
+                }
+              },
+              "queryRef": "dim_seller.Late Delivery % (items view)",
+              "nativeQueryRef": "Late Delivery % (items view)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_seller"
+                    }
+                  },
+                  "Property": "Avg Review (items view)"
+                }
+              },
+              "queryRef": "dim_seller.Avg Review (items view)",
+              "nativeQueryRef": "Avg Review (items view)"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

@@ -1,0 +1,29 @@
+createOrReplace
+
+	ref table fct_order_items
+
+		measure 'GMV YoY %' = ```
+				VAR py = [GMV PY]
+				VAR firstDay = CALCULATE ( MIN ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+				RETURN IF ( NOT ISBLANK ( py ) && EDATE ( MIN ( dim_date[date] ), -12 ) >= firstDay, DIVIDE ( [GMV] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+		measure 'GMV YoY % (latest year)' = ```
+				VAR y = MAX ( dim_date[year] )
+				RETURN CALCULATE ( [GMV YoY %], dim_date[year] = y )
+				```
+			formatString: 0.0%
+			displayFolder: Sales
+
+	ref table fct_orders
+
+		measure 'Orders YoY %' = ```
+				VAR py = [Orders PY]
+				VAR firstDay = CALCULATE ( MIN ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+				RETURN IF ( NOT ISBLANK ( py ) && EDATE ( MIN ( dim_date[date] ), -12 ) >= firstDay, DIVIDE ( [Orders] - py, py ) )
+				```
+			formatString: 0.0%
+			displayFolder: Orders
+

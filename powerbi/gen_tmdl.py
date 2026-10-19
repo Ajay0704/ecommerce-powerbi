@@ -225,5 +225,23 @@ def main_sort() -> None:
     print("sort columns -> powerbi/model_sort.tmdl")
 
 
+def main_measures(names: list[str]) -> None:
+    """createOrReplace just the named measures on their home tables (for incremental fixes)."""
+    by_table: dict[str, list] = {}
+    for m in parse_measures((HERE / "measures.dax").read_text()):
+        if m[1] in names:
+            by_table.setdefault(HOME[m[0]], []).append(m)
+    lines = ["createOrReplace", ""]
+    for table, items in by_table.items():
+        lines += [f"\tref table {table}", ""]
+        for m in items:
+            lines += measure_tmdl(*m)
+    (HERE / "model_patch.tmdl").write_text("\n".join(lines) + "\n")
+    print(f"{sum(map(len, by_table.values()))} measures -> powerbi/model_patch.tmdl")
+
+
 if __name__ == "__main__":
+    if "--measures" in sys.argv:
+        main_measures(sys.argv[sys.argv.index("--measures") + 1].split("|"))
+        sys.exit()
     main_sort() if "--sort" in sys.argv else main_full() if "--full" in sys.argv else main_model()

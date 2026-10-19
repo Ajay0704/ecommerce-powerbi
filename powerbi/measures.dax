@@ -2,6 +2,8 @@
 // gen_tmdl.py turns this file into TMDL (home table per folder, format strings).
 // Rules: GMV = item price of non-cancelled orders (freight reported separately).
 // Flags on nullable columns use == 0: in DAX BLANK = 0 is TRUE, so `= 0` would count undelivered orders as on time.
+// YoY returns blank unless the whole prior-year period is inside the data (no 2016), so an all-years view
+// never compares 20 months against 8.
 // Time intelligence removes dim_date filters explicitly, so it works whether or not dim_date is marked as a date table.
 
 // ---------- Sales ----------
@@ -26,7 +28,12 @@ CALCULATE ( [GMV], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim_da
 
 GMV YoY % =
 VAR py = [GMV PY]
-RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [GMV] - py, py ) )
+VAR firstDay = CALCULATE ( MIN ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+RETURN IF ( NOT ISBLANK ( py ) && EDATE ( MIN ( dim_date[date] ), -12 ) >= firstDay, DIVIDE ( [GMV] - py, py ) )
+
+GMV YoY % (latest year) =
+VAR y = MAX ( dim_date[year] )
+RETURN CALCULATE ( [GMV YoY %], dim_date[year] = y )
 
 GMV PM =
 CALCULATE ( [GMV], DATEADD ( dim_date[date], -1, MONTH ), REMOVEFILTERS ( dim_date ) )
@@ -62,7 +69,8 @@ CALCULATE ( [Orders], SAMEPERIODLASTYEAR ( dim_date[date] ), REMOVEFILTERS ( dim
 
 Orders YoY % =
 VAR py = [Orders PY]
-RETURN IF ( NOT ISBLANK ( py ), DIVIDE ( [Orders] - py, py ) )
+VAR firstDay = CALCULATE ( MIN ( dim_date[date] ), REMOVEFILTERS ( dim_date ) )
+RETURN IF ( NOT ISBLANK ( py ) && EDATE ( MIN ( dim_date[date] ), -12 ) >= firstDay, DIVIDE ( [Orders] - py, py ) )
 
 // ---------- Delivery ----------
 Delivered Orders = CALCULATE ( COUNTROWS ( fct_orders ), fct_orders[is_delivered] = 1 )
